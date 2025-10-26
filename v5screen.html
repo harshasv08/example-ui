@@ -1,0 +1,2532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Placement Management System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* === NEW: Color Palette (Gradients Re-introduced) === */
+        :root {
+            --admin-grad: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            --student-grad: linear-gradient(180deg, #4facfe 0%, #00f2fe 100%);
+            --placement-grad: linear-gradient(180deg, #43e97b 0%, #38f9d7 100%);
+            
+            --admin-color: #667eea;
+            --student-color: #4facfe;
+            --placement-color: #38a169;
+            
+            --dark-text: #2d3748;
+            --light-text: #718096;
+            --border-color: #e2e8f0;
+            --light-bg: #f4f7fc; /* Main page background */
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--light-bg);
+            min-height: 100vh;
+            color: var(--dark-text);
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+
+        /* === NEW: Permanent Sidebar (Replaces Hamburger) === */
+        .side-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 280px; /* Fixed width */
+            height: 100vh;
+            z-index: 1000;
+            transition: left 0.3s;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Sidebar Logo Area */
+        .sidebar-logo-container {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        .sidebar-logo {
+            display: none; /* Hide all by default */
+            text-align: center;
+            color: var(--white);
+        }
+        .sidebar-logo .icon {
+            font-size: 40px;
+            line-height: 1;
+        }
+        .sidebar-logo h2 {
+            font-size: 22px;
+            margin-top: 10px;
+            font-weight: 600;
+        }
+
+        /* Contextual Sidebar: Color */
+        body.admin-logged-in .side-nav {
+            background: var(--admin-grad);
+        }
+        body.student-logged-in .side-nav {
+            background: var(--student-grad);
+        }
+        body.placement-logged-in .side-nav {
+            background: var(--placement-grad);
+        }
+
+        /* Contextual Sidebar: Logo */
+        body.admin-logged-in .sidebar-logo.admin { display: block; }
+        body.student-logged-in .sidebar-logo.student { display: block; }
+        body.placement-logged-in .sidebar-logo.placement { display: block; }
+
+        /* Sidebar Navigation */
+        .nav-section {
+            margin-bottom: 20px;
+        }
+        .nav-section h3 {
+            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            padding-left: 10px;
+        }
+
+        /* Hide portal navs by default */
+        .side-nav .nav-section.admin,
+        .side-nav .nav-section.student,
+        .side-nav .nav-section.placement {
+            display: none;
+        }
+        
+        /* Show specific portal nav when logged in */
+        body.admin-logged-in .nav-section.admin { display: block; }
+        body.student-logged-in .nav-section.student { display: block; }
+        body.placement-logged-in .nav-section.placement { display: block; }
+
+        .nav-btn {
+            width: 100%;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s;
+            background: transparent;
+            color: rgba(255,255,255,0.8);
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .nav-btn .icon {
+            font-size: 18px;
+            line-height: 1;
+        }
+        
+        .nav-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: var(--white);
+        }
+        .nav-btn.active {
+            background: rgba(255,255,255,0.2);
+            color: var(--white);
+            font-weight: 700;
+        }
+
+        /* === NEW: Main Content Container === */
+        .container {
+            padding: 30px;
+            margin-left: 280px; /* Make space for sidebar */
+            transition: margin-left 0.3s;
+        }
+
+        /* === NEW: Logged-out State === */
+        body.logged-out .side-nav {
+            left: -300px; /* Hide sidebar */
+        }
+        body.logged-out .container {
+            margin-left: 0; /* Content full-width */
+        }
+
+
+        .screen {
+            display: none;
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            animation: fadeIn 0.5s;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Auth screens have no top padding */
+        .screen.auth-screen {
+             padding: 40px;
+        }
+        
+        /* Dashboard screens have no padding, handled by main-content */
+        .screen.dashboard-screen {
+            padding: 0;
+            overflow: hidden; /* For top-bar radius */
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* === PORTAL SELECTION (Logged-out) === */
+        .portal-selection {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        .portal-selection h1 {
+            font-size: 42px;
+            color: var(--dark-text);
+            margin-bottom: 20px;
+        }
+        .portal-selection p {
+            font-size: 18px;
+            color: var(--light-text);
+            margin-bottom: 60px;
+        }
+        .portal-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .portal-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 40px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border: 2px solid transparent;
+        }
+        .portal-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .portal-card.admin:hover { border-color: var(--admin-color); }
+        .portal-card.student:hover { border-color: var(--student-color); }
+        .portal-card.placement:hover { border-color: var(--placement-color); }
+        .portal-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 25px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: var(--white);
+        }
+        
+        /* Re-introduced Gradients */
+        .portal-card.admin .portal-icon { background: var(--admin-grad); }
+        .portal-card.student .portal-icon { background: var(--student-grad); }
+        .portal-card.placement .portal-icon { background: var(--placement-grad); }
+
+        .portal-card h2 { font-size: 24px; color: var(--dark-text); margin-bottom: 15px; }
+        .portal-card p { color: var(--light-text); font-size: 16px; line-height: 1.6; }
+
+        /* === AUTH CONTAINER (Logged-out) === */
+        .auth-container {
+            max-width: 450px;
+            margin: 0 auto;
+        }
+        .logo { text-align: center; margin-bottom: 30px; }
+        .logo-icon {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            color: white;
+            margin-bottom: 15px;
+        }
+        .logo h1 { font-size: 26px; color: var(--dark-text); margin-bottom: 8px; }
+        .logo p { color: var(--light-text); font-size: 15px; }
+        .portal-tag {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--white);
+        }
+        
+        /* Re-introduced Gradient Tags */
+        .admin-tag { background: var(--admin-grad); }
+        .student-tag { background: var(--student-grad); }
+        .placement-tag { background: var(--placement-grad); }
+
+        .credentials-box {
+            background: var(--light-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 25px;
+            font-size: 13px;
+        }
+        .credentials-box strong { display: block; color: var(--dark-text); margin-bottom: 8px; font-size: 14px; }
+        .credentials-box p { color: #4a5568; margin: 4px 0; font-family: 'Courier New', monospace; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--dark-text); font-weight: 600; font-size: 14px; }
+        .form-input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.3s;
+            background: var(--white);
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--admin-color);
+            background: var(--white);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        textarea.form-input { min-height: 100px; }
+        .btn-primary {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: white;
+            margin-top: 10px;
+        }
+        
+        /* Re-introduced Gradient Buttons */
+        .admin-btn { background: var(--admin-grad); }
+        .student-btn { background: var(--student-grad); }
+        .placement-btn { background: var(--placement-grad); }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        
+        .btn-secondary {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: white;
+            margin-right: 5px;
+        }
+        .btn-edit { background: var(--student-color); }
+        .btn-delete { background: #e53e3e; }
+        .btn-view { background: var(--placement-color); }
+        .btn-edit:hover, .btn-delete:hover, .btn-view:hover { opacity: 0.8; }
+        
+        .link-text { text-align: center; margin-top: 20px; color: var(--light-text); font-size: 14px; }
+        .link-text a { color: var(--admin-color); text-decoration: none; font-weight: 600; cursor: pointer; }
+        .link-text a:hover { text-decoration: underline; }
+
+        /* === DASHBOARD (Logged-in) === */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr; /* Sidebar is gone from here */
+            gap: 20px;
+            min-height: 600px;
+        }
+        
+        /* Main content styling */
+        .main-content {
+            background: transparent; /* No background, page bg shows */
+            padding: 0; /* No padding, handled by top-bar and boxes */
+        }
+        
+        /* NEW: Floating Top Bar (Header) */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px 30px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--white);
+            border-radius: 12px 12px 0 0;
+        }
+
+        .top-bar h2 { font-size: 28px; color: var(--dark-text); }
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        .user-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        .admin-avatar { background: var(--admin-grad); }
+        .student-avatar { background: var(--student-grad); }
+        .placement-avatar { background: var(--placement-grad); }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 0 30px; /* Add padding here */
+        }
+        .stat-card {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+            border: 1px solid var(--border-color);
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        }
+        .stat-card h3 {
+            font-size: 14px;
+            color: var(--light-text);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-card .number {
+            font-size: 36px;
+            font-weight: 700;
+        }
+        
+        /* Re-introduced Gradient Text for Stats */
+        .admin-stats .number {
+            background: var(--admin-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .student-stats .number {
+            background: var(--student-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .placement-stats .number {
+            background: var(--placement-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Profile & Content Pages */
+        .profile-container, .content-box {
+            background: var(--white);
+            padding: 30px;
+            border-radius: 0 0 12px 12px; /* Top radius handled by top-bar */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin: 0 30px 30px 30px; /* Add horizontal margin */
+        }
+        
+        /* For dashboard first content box */
+        .dashboard-container .main-content > .content-box {
+             border-radius: 12px;
+             margin: 0 30px 30px 30px;
+        }
+        
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 42px;
+            font-weight: 600;
+        }
+        .profile-info h2 { font-size: 28px; color: var(--dark-text); margin-bottom: 5px; }
+        .profile-info p { color: var(--light-text); font-size: 16px; }
+        .profile-form {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        .profile-form .form-group.full-width { grid-column: 1 / -1; }
+
+        /* === STYLES FOR DUMMY PAGES === */
+        .content-box h3 { color: var(--dark-text); margin-bottom: 20px; font-size: 20px; }
+        .table-wrapper { overflow-x: auto; }
+        .data-table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        .data-table th, .data-table td { padding: 12px 15px; border-bottom: 1px solid var(--border-color); text-align: left; }
+        .data-table th { background: var(--light-bg); color: #4a5568; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .data-table td { color: var(--dark-text); font-size: 14px; vertical-align: middle; }
+        .data-table tbody tr:hover { background: var(--light-bg); }
+        .status-tag { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-block; }
+        .status-placed, .status-offered { background: #c6f6d5; color: #2f855a; }
+        .status-pending, .status-applied { background: #feebc8; color: #975a16; }
+        .status-rejected { background: #fed7d7; color: #c53030; }
+        .status-active, .status-interview { background: #c3dafe; color: #3182ce; }
+        .status-inactive { background: #e2e8f0; color: #4a5568; }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .job-card, .company-card {
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            padding: 25px;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+        }
+        .job-card:hover, .company-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        }
+        .job-card h4, .company-card h4 { font-size: 18px; color: var(--dark-text); margin-bottom: 5px; }
+        .job-card .company, .company-card .location { font-size: 14px; color: var(--light-text); margin-bottom: 15px; }
+        .job-card .details { font-size: 14px; color: #4a5568; line-height: 1.6; flex-grow: 1; }
+        .job-card .salary { font-size: 15px; font-weight: 600; color: var(--admin-color); margin-top: 15px; }
+        .job-card .tags { margin-top: 15px; }
+        .job-card .tag { display: inline-block; background: #e2e8f0; color: #4a5568; padding: 4px 10px; border-radius: 20px; font-size: 12px; margin-right: 5px; margin-bottom: 5px; }
+        .job-card .btn-primary { margin-top: 20px; }
+
+        .resume-section { margin-bottom: 25px; }
+        .resume-section h4 { font-size: 18px; color: var(--dark-text); margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+        .resume-item { margin-bottom: 15px; }
+        .resume-item strong { display: block; font-size: 16px; color: #4a5568; }
+        .resume-item span { font-size: 14px; color: var(--light-text); }
+        .resume-item p { font-size: 14px; color: #4a5568; margin-top: 5px; }
+        .chart-placeholder { width: 100%; height: 300px; background: var(--light-bg); border: 2px dashed var(--border-color); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #a0aec0; font-weight: 600; font-size: 18px; margin-bottom: 20px; }
+
+        @media (max-width: 1024px) {
+            /* On smaller screens, hide the sidebar and use full width */
+            .side-nav { left: -300px; }
+            .container { margin-left: 0; }
+            
+            /* Use a hamburger menu */
+            .menu-btn {
+                display: flex;
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                width: 50px;
+                height: 50px;
+                background: white;
+                border: 1px solid var(--border-color);
+                border-radius: 10px;
+                cursor: pointer;
+                z-index: 1001;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 5px;
+                transition: all 0.3s;
+            }
+            .menu-btn span { width: 25px; height: 3px; background: var(--admin-color); border-radius: 2px; transition: all 0.3s; }
+            .menu-btn.active span:nth-child(1) { transform: rotate(45deg) translate(8px, 8px); }
+            .menu-btn.active span:nth-child(2) { opacity: 0; }
+            .menu-btn.active span:nth-child(3) { transform: rotate(-45deg) translate(7px, -7px); }
+
+            .nav-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; }
+            .nav-overlay.active { display: block; }
+            .side-nav.active { left: 0; }
+            
+            /* Hide menu button when logged out on mobile */
+            body.logged-out .menu-btn { display: none; }
+        }
+
+        @media (max-width: 768px) {
+            .profile-form { grid-template-columns: 1fr; }
+            .portal-cards { grid-template-columns: 1fr; }
+            .top-bar { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .container { padding: 15px; }
+            .top-bar { padding: 20px; }
+            .stats-grid { padding: 0 20px; }
+            .profile-container, .content-box { padding: 20px; margin: 0 0 20px 0; border-radius: 12px; }
+            .dashboard-container .main-content > .content-box { margin: 0 20px 20px 20px; }
+            .screen.auth-screen { padding: 20px; }
+            
+            /* Adjust chatbot for smaller screens */
+            .chatbot-container { bottom: 20px; right: 20px; }
+            .chatbot-window { width: 300px; height: 400px; }
+        }
+        
+        /* === NEW: AI Chatbot Styles === */
+        .chatbot-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1050; /* Above everything else */
+            display: none; /* Hidden by default */
+        }
+        
+        body.logged-in .chatbot-container {
+             display: block; /* Only show when logged in */
+        }
+
+        .chatbot-toggle-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.3s, opacity 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 80%;
+        }
+        .chatbot-toggle-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        /* Contextual Chatbot Color */
+        body.admin-logged-in .chatbot-toggle-btn { background: var(--admin-color); }
+        body.student-logged-in .chatbot-toggle-btn { background: var(--student-color); }
+        body.placement-logged-in .chatbot-toggle-btn { background: var(--placement-color); }
+
+
+        .chatbot-window {
+            width: 350px;
+            height: 450px;
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: scale(0);
+            transform-origin: bottom right;
+            transition: transform 0.3s;
+        }
+        .chatbot-window.active {
+            transform: scale(1);
+        }
+
+        .chatbot-header {
+            padding: 15px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+        .chatbot-header button {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        
+        /* Contextual Chatbot Header Color */
+        body.admin-logged-in .chatbot-header { background: var(--admin-color); }
+        body.student-logged-in .chatbot-header { background: var(--student-color); }
+        body.placement-logged-in .chatbot-header { background: var(--placement-color); }
+
+
+        .chatbot-messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: var(--light-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-message {
+            margin-bottom: 10px;
+            max-width: 85%;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .chat-message.bot {
+            background: var(--white);
+            border: 1px solid var(--border-color);
+            align-self: flex-start;
+            margin-right: auto;
+        }
+        .chat-message.user {
+            background: var(--admin-color); /* Neutral color for user */
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .chatbot-input-area {
+            padding: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .chatbot-input-area input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .chatbot-input-area button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        /* Contextual Chatbot Input Button Color */
+        body.admin-logged-in .chatbot-input-area button { background: var(--admin-color); }
+        body.student-logged-in .chatbot-input-area button { background: var(--student-color); }
+        body.placement-logged-in .chatbot-input-area button { background: var(--placement-color); }
+    </style>
+</head>
+<body class="logged-out"> 
+    <button class="menu-btn" id="menuBtn" onclick="toggleMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+    <div class="nav-overlay" id="navOverlay" onclick="toggleMenu()"></div>
+
+
+    <div class="side-nav" id="sideNav">
+        <div class="sidebar-logo-container">
+            <div class="sidebar-logo admin">
+                <div class="icon">👨‍💼</div>
+                <h2>Admin Portal</h2>
+            </div>
+            <div class="sidebar-logo student">
+                <div class="icon">👨‍🎓</div>
+                <h2>Student Portal</h2>
+            </div>
+            <div class="sidebar-logo placement">
+                <div class="icon">💼</div>
+                <h2>Placement Office</h2>
+            </div>
+        </div>
+
+        <div class="nav-section admin">
+            <h3>Menu</h3>
+            <button class="nav-btn" data-screen="admin-dashboard" onclick="showScreen('admin-dashboard')"><span class="icon">📊</span> Dashboard</button>
+            <button class="nav-btn" data-screen="admin-students" onclick="showScreen('admin-students')"><span class="icon">👨‍🎓</span> Students</button>
+            <button class="nav-btn" data-screen="admin-companies" onclick="showScreen('admin-companies')"><span class="icon">🏢</span> Companies</button>
+            <button class="nav-btn" data-screen="admin-placements" onclick="showScreen('admin-placements')"><span class="icon">💼</span> Placements</button>
+            <button class="nav-btn" data-screen="admin-reports" onclick="showScreen('admin-reports')"><span class="icon">📝</span> Reports</button>
+            <button class="nav-btn" data-screen="admin-profile" onclick="showScreen('admin-profile')"><span class="icon">👤</span> Profile</button>
+            <button class="nav-btn" data-screen="admin-settings" onclick="showScreen('admin-settings')"><span class="icon">⚙️</span> Settings</button>
+        </div>
+
+        <div class="nav-section student">
+            <h3>Menu</h3>
+            <button class="nav-btn" data-screen="student-dashboard" onclick="showScreen('student-dashboard')"><span class="icon">📊</span> Dashboard</button>
+            <button class="nav-btn" data-screen="student-jobs" onclick="showScreen('student-jobs')"><span class="icon">💼</span> Job Openings</button>
+            <button class="nav-btn" data-screen="student-applications" onclick="showScreen('student-applications')"><span class="icon">📝</span> Applications</button>
+            <button class="nav-btn" data-screen="student-resume" onclick="showScreen('student-resume')"><span class="icon">📄</span> Resume</button>
+            <button class="nav-btn" data-screen="student-interviews" onclick="showScreen('student-interviews')"><span class="icon">📅</span> Interviews</button>
+            <button class="nav-btn" data-screen="student-profile" onclick="showScreen('student-profile')"><span class="icon">👤</span> Profile</button>
+            <button class="nav-btn" data-screen="student-settings" onclick="showScreen('student-settings')"><span class="icon">⚙️</span> Settings</button>
+        </div>
+
+        <div class="nav-section placement">
+            <h3>Menu</h3>
+            <button class="nav-btn" data-screen="placement-dashboard" onclick="showScreen('placement-dashboard')"><span class="icon">📊</span> Dashboard</button>
+            <button class="nav-btn" data-screen="placement-companies" onclick="showScreen('placement-companies')"><span class="icon">🏢</span> Companies</button>
+            <button class="nav-btn" data-screen="placement-schedules" onclick="showScreen('placement-schedules')"><span class="icon">📅</span> Schedules</button>
+            <button class="nav-btn" data-screen="placement-students" onclick="showScreen('placement-students')"><span class="icon">👨‍🎓</span> Students</button>
+            <button class="nav-btn" data-screen="placement-drives" onclick="showScreen('placement-drives')"><span class="icon">💼</span> Drives</button>
+            <button class="nav-btn" data-screen="placement-analytics" onclick="showScreen('placement-analytics')"><span class="icon">📊</span> Analytics</button>
+            <button class="nav-btn" data-screen="placement-profile" onclick="showScreen('placement-profile')"><span class="icon">👤</span> Profile</button>
+            <button class="nav-btn" data-screen="placement-settings" onclick="showScreen('placement-settings')"><span class="icon">⚙️</span> Settings</button>
+        </div>
+        
+        <div class="nav-section" style="margin-top: auto;">
+             <button class="nav-btn" data-screen="portal-selection" onclick="logout()"><span class="icon">🚪</span> Logout</button>
+        </div>
+    </div>
+
+    <div class="container" id="mainContainer">
+        <div id="portal-selection" class="screen auth-screen active">
+            <div class="portal-selection">
+                <h1>🎓 Placement Management System</h1>
+                <p>Select your portal to continue</p>
+                <div class="portal-cards">
+                    <div class="portal-card admin" onclick="showScreen('admin-login')">
+                        <div class="portal-icon">👨‍💼</div>
+                        <h2>Admin Portal</h2>
+                        <p>Manage the entire placement system, students, companies, and generate reports</p>
+                    </div>
+                    <div class="portal-card student" onclick="showScreen('student-login')">
+                        <div class="portal-icon">👨‍🎓</div>
+                        <h2>Student Portal</h2>
+                        <p>Apply for jobs, track applications, and manage your placement profile</p>
+                    </div>
+                    <div class="portal-card placement" onclick="showScreen('placement-login')">
+                        <div class="portal-icon">💼</div>
+                        <h2>Placement Office</h2>
+                        <p>Coordinate placement drives, schedule interviews, and manage company relations</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="admin-login" class="screen auth-screen">
+            <div class="auth-container">
+                <div class="logo">
+                    <div class="logo-icon">🎓</div>
+                    <h1>Placement Management</h1>
+                    <p>Admin Portal</p>
+                    <div class="portal-tag admin-tag">Administrator Access</div>
+                </div>
+                <div class="credentials-box">
+                    <strong>🔐 Demo Credentials</strong>
+                    <p>Email: admin@gmail.com</p>
+                    <p>Password: 1234</p>
+                </div>
+                <form onsubmit="return handleAdminLogin(event)">
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" class="form-input" id="adminEmail" placeholder="admin@gmail.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" class="form-input" id="adminPassword" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="btn-primary admin-btn">Sign In</button>
+                    <div class="link-text">
+                        <a onclick="showScreen('admin-forget')">Forgot your password?</a>
+                    </div>
+                    <div class="link-text">
+                        <a onclick="showScreen('portal-selection')">← Back to Portal Selection</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="admin-forget" class="screen auth-screen">
+            <div class="auth-container">
+                <div class="logo">
+                    <div class="logo-icon">🔒</div>
+                    <h1>Reset Password</h1>
+                    <p>Admin Portal</p>
+                    <div class="portal-tag admin-tag">Administrator Access</div>
+                </div>
+                <p style="text-align: center; color: var(--light-text); margin-bottom: 25px;">
+                    Enter your email address and we'll send you a link to reset your password.
+                </p>
+                <form>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" class="form-input" placeholder="admin@gmail.com" required>
+                    </div>
+                    <button type="button" class="btn-primary admin-btn" onclick="showScreen('admin-reset')">Send Reset Link</button>
+                    <div class="link-text">
+                        <a onclick="showScreen('admin-login')">Back to Login</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="admin-reset" class="screen auth-screen">
+            <div class="auth-container">
+                <div class="logo">
+                    <div class="logo-icon">🔑</div>
+                    <h1>Create New Password</h1>
+                    <p>Admin Portal</p>
+                    <div class="portal-tag admin-tag">Administrator Access</div>
+                </div>
+                <form>
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" class="form-input" placeholder="Enter new password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <input type="password" class="form-input" placeholder="Confirm new password" required>
+                    </div>
+                    <button type="button" class="btn-primary admin-btn" onclick="showScreen('admin-login')">Reset Password</button>
+                    <div class="link-text">
+                        <a onclick="showScreen('admin-login')">Back to Login</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="admin-dashboard" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Dashboard Overview</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Admin User</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Administrator</div>
+                            </div>
+                            <div class="user-avatar admin-avatar">AU</div>
+                        </div>
+                    </div>
+                    <div class="stats-grid admin-stats">
+                        <div class="stat-card">
+                            <h3>Total Students</h3>
+                            <div class="number">1,245</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Active Companies</h3>
+                            <div class="number">87</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Placements This Year</h3>
+                            <div class="number">432</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Placement Rate</h3>
+                            <div class="number">84%</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Recent Activities</h3>
+                        <div style="color: var(--light-text); line-height: 2;">
+                            <p>• Google recruitment drive scheduled for Dec 15, 2025</p>
+                            <p>• 45 new students registered this week</p>
+                            <p>• Microsoft campus interview completed</p>
+                            <p>• Placement report generated for Nov 2025</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="admin-students" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Manage Students</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Admin User</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Administrator</div>
+                            </div>
+                            <div class="user-avatar admin-avatar">AU</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>All Students</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Student ID</th>
+                                        <th>Name</th>
+                                        <th>Department</th>
+                                        <th>CGPA</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>S2025001</td>
+                                        <td>John Smith</td>
+                                        <td>Computer Science</td>
+                                        <td>8.5</td>
+                                        <td><span class="status-tag status-placed">Placed</span></td>
+                                        <td>
+                                            <button class="btn-secondary btn-view">View</button>
+                                            <button class="btn-secondary btn-edit">Edit</button>
+                                            <button class="btn-secondary btn-delete">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>S2025002</td>
+                                        <td>Emily Davis</td>
+                                        <td>Electronics</td>
+                                        <td>9.2</td>
+                                        <td><span class="status-tag status-pending">Pending</span></td>
+                                        <td>
+                                            <button class="btn-secondary btn-view">View</button>
+                                            <button class="btn-secondary btn-edit">Edit</button>
+                                            <button class="btn-secondary btn-delete">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>S2025003</td>
+                                        <td>Michael Brown</td>
+                                        <td>Mechanical</td>
+                                        <td>7.8</td>
+                                        <td><span class="status-tag status-pending">Pending</span></td>
+                                        <td>
+                                            <button class="btn-secondary btn-view">View</button>
+                                            <button class="btn-secondary btn-edit">Edit</button>
+                                            <button class="btn-secondary btn-delete">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>S2025004</td>
+                                        <td>Jessica Wilson</td>
+                                        <td>Computer Science</td>
+                                        <td>9.5</td>
+                                        <td><span class="status-tag status-placed">Placed</span></td>
+                                        <td>
+                                            <button class="btn-secondary btn-view">View</button>
+                                            <button class="btn-secondary btn-edit">Edit</button>
+                                            <button class="btn-secondary btn-delete">Delete</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="admin-companies" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Manage Companies</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Admin User</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Administrator</div>
+                            </div>
+                            <div class="user-avatar admin-avatar">AU</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Registered Companies</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Company Name</th>
+                                        <th>Industry</th>
+                                        <th>Contact Person</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Google</td>
+                                        <td>Technology</td>
+                                        <td>Sundar Pichai</td>
+                                        <td><span class="status-tag status-active">Active</span></td>
+                                        <td>
+                                            <button class="btn-secondary btn-edit">Edit</button>
+                                            <button class="btn-secondary btn-delete">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Microsoft</td>
+                                        <td>Technology</td>
+                                        <td>Satya Nadella</td>
+                                        <td><span class="status-tag status-active">Active</span></td>
+                                        <td>
+                                            <button class="btn-secondary btn-edit">Edit</button>
+                                            <button class="btn-secondary btn-delete">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Amazon</td>
+                                        <td>E-commerce</td>
+                                        <td>Andy Jassy</td>
+                                        <td><span class="status-tag status-active">Active</span></td>
+                                        <td>
+                                            <button class="btn-secondary btn-edit">Edit</button>
+                                            <button class="btn-secondary btn-delete">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>TCS</td>
+                                        <td>IT Services</td>
+                                        <td>K. Krithivasan</td>
+                                        <td><span class="status-tag status-inactive">Inactive</span></td>
+                                        <td>
+                                            <button class="btn-secondary btn-edit">Edit</button>
+                                            <button class="btn-secondary btn-delete">Delete</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="admin-placements" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Placement Records</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Admin User</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Administrator</div>
+                            </div>
+                            <div class="user-avatar admin-avatar">AU</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>All Placed Students (2025)</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Student Name</th>
+                                        <th>Department</th>
+                                        <th>Company</th>
+                                        <th>Job Title</th>
+                                        <th>Package (LPA)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>John Smith</td>
+                                        <td>Computer Science</td>
+                                        <td>Amazon</td>
+                                        <td>SDE-1</td>
+                                        <td>18.0</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Jessica Wilson</td>
+                                        <td>Computer Science</td>
+                                        <td>Google</td>
+                                        <td>Software Engineer</td>
+                                        <td>22.5</td>
+                                    </tr>
+                                    <tr>
+                                        <td>David Lee</td>
+                                        <td>Electronics</td>
+                                        <td>Microsoft</td>
+                                        <td>Program Manager</td>
+                                        <td>16.0</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Sarah Chen</td>
+                                        <td>Mechanical</td>
+                                        <td>Tata Motors</td>
+                                        <td>Graduate Engineer Trainee</td>
+                                        <td>8.0</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="admin-reports" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Reports & Analytics</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Admin User</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Administrator</div>
+                            </div>
+                            <div class="user-avatar admin-avatar">AU</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Placement Rate by Department</h3>
+                        <div class="chart-placeholder">
+                            [ Bar Chart: CSE (92%), ECE (88%), MECH (75%), CIVIL (68%) ]
+                        </div>
+                    </div>
+                    <div class="content-box" style="border-radius: 12px;">
+                        <h3>Average Salary by Company</h3>
+                        <div class="chart-placeholder">
+                            [ Line Chart: Google (22 LPA), Microsoft (20 LPA), Amazon (18 LPA) ]
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="admin-profile" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>My Profile</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Admin User</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Administrator</div>
+                            </div>
+                            <div class="user-avatar admin-avatar">AU</div>
+                        </div>
+                    </div>
+                    <div class="profile-container">
+                        <div class="profile-header">
+                            <div class="profile-avatar admin-avatar" style="background: var(--admin-grad);">AU</div>
+                            <div class="profile-info">
+                                <h2>Admin User</h2>
+                                <p>admin@gmail.com</p>
+                                <div class="portal-tag admin-tag" style="margin-top: 10px;">Administrator</div>
+                            </div>
+                        </div>
+                        <form class="profile-form">
+                            <div class="form-group">
+                                <label>First Name</label>
+                                <input type="text" class="form-input" value="Admin" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Last Name</label>
+                                <input type="text" class="form-input" value="User" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Email Address</label>
+                                <input type="email" class="form-input" value="admin@gmail.com" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Phone Number</label>
+                                <input type="tel" class="form-input" value="+1 234 567 8900" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Department</label>
+                                <input type="text" class="form-input" value="Administration" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Role</label>
+                                <input type="text" class="form-input" value="Super Administrator" required>
+                            </div>
+                            <div class="form-group full-width">
+                                <button type="submit" class="btn-primary admin-btn">Update Profile</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="admin-settings" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>System Settings</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Admin User</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Administrator</div>
+                            </div>
+                            <div class="user-avatar admin-avatar">AU</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>General Settings</h3>
+                        <form class="profile-form">
+                            <div class="form-group">
+                                <label>Placement Cycle Year</label>
+                                <input type="text" class="form-input" value="2025-2026" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Registration Deadline</label>
+                                <input type="date" class="form-input" value="2025-11-30" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Minimum CGPA Criteria</label>
+                                <input type="text" class="form-input" value="7.0" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Email Notifications</label>
+                                <select class="form-input">
+                                    <option>Enabled</option>
+                                    <option>Disabled</option>
+                                </select>
+                            </div>
+                            <div class="form-group full-width">
+                                <button type="submit" class="btn-primary admin-btn">Save Settings</button>
+                            </div>
+                        </form>
+                        <h3 style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">Backup & Maintenance</h3>
+                        <div class="form-group">
+                             <button type="button" class="btn-primary admin-btn" style="width: auto;">Run Database Backup</button>
+                             <button type="button" class="btn-secondary btn-delete" style="width: auto; margin-left: 10px; background: #975a16;">Clear Cache</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="student-login" class="screen auth-screen">
+            <div class="auth-container">
+                <div class="logo">
+                    <div class="logo-icon">🎓</div>
+                    <h1>Placement Management</h1>
+                    <p>Student Portal</p>
+                    <div class="portal-tag student-tag">Student Access</div>
+                </div>
+                <div class="credentials-box">
+                    <strong>🔐 Demo Credentials</strong>
+                    <p>Email: student@gmail.com</p>
+                    <p>Password: 1234</p>
+                </div>
+                <form onsubmit="return handleStudentLogin(event)">
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" class="form-input" id="studentEmail" placeholder="student@gmail.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" class="form-input" id="studentPassword" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="btn-primary student-btn">Sign In</button>
+                    <div class="link-text">
+                        <a onclick="showScreen('student-forget')">Forgot your password?</a>
+                    </div>
+                    <div class="link-text">
+                        <a onclick="showScreen('portal-selection')">← Back to Portal Selection</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="student-forget" class="screen auth-screen">
+            <div class="auth-container">
+                <div class="logo">
+                    <div class="logo-icon">🔒</div>
+                    <h1>Reset Password</h1>
+                    <p>Student Portal</p>
+                    <div class="portal-tag student-tag">Student Access</div>
+                </div>
+                <p style="text-align: center; color: var(--light-text); margin-bottom: 25px;">
+                    Enter your email address and we'll send you a link to reset your password.
+                </p>
+                <form>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" class="form-input" placeholder="student@gmail.com" required>
+                    </div>
+                    <button type="button" class="btn-primary student-btn" onclick="showScreen('student-reset')">Send Reset Link</button>
+                    <div class="link-text">
+                        <a onclick="showScreen('student-login')">Back to Login</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="student-reset" class="screen auth-screen">
+            <div class="auth-container">
+                <div class="logo">
+                    <div class="logo-icon">🔑</div>
+                    <h1>Create New Password</h1>
+                    <p>Student Portal</p>
+                    <div class="portal-tag student-tag">Student Access</div>
+                </div>
+                <form>
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" class="form-input" placeholder="Enter new password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <input type="password" class="form-input" placeholder="Confirm new password" required>
+                    </div>
+                    <button type="button" class="btn-primary student-btn" onclick="showScreen('student-login')">Reset Password</button>
+                    <div class="link-text">
+                        <a onclick="showScreen('student-login')">Back to Login</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="student-dashboard" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Welcome, John Smith</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">John Smith</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Computer Science</div>
+                            </div>
+                            <div class="user-avatar student-avatar">JS</div>
+                        </div>
+                    </div>
+                    <div class="stats-grid student-stats">
+                        <div class="stat-card">
+                            <h3>Total Applications</h3>
+                            <div class="number">12</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Pending Status</h3>
+                            <div class="number">3</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Scheduled Interviews</h3>
+                            <div class="number">1</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Job Offers</h3>
+                            <div class="number">1</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Latest Job Openings</h3>
+                        <div class="card-grid">
+                            <div class="job-card">
+                                <h4>Software Development Engineer</h4>
+                                <div class="company">Google</div>
+                                <div class="details">Develop and launch new features for our core search engine product. Required skills: Python, C++, Algorithms.</div>
+                                <div class="tags">
+                                    <span class="tag">Full-Time</span>
+                                    <span class="tag">On-Campus</span>
+                                    <span class="tag">SDE</span>
+                                </div>
+                                <div class="salary">CTC: 22 LPA</div>
+                                <button class="btn-primary student-btn">View Details</button>
+                            </div>
+                            <div class="job-card">
+                                <h4>Program Manager Intern</h4>
+                                <div class="company">Microsoft</div>
+                                <div class="details">Work with product teams to define feature requirements and manage the software development lifecycle.</div>
+                                <div class="tags">
+                                    <span class="tag">Internship</span>
+                                    <span class="tag">Summer</span>
+                                    <span class="tag">PM</span>
+                                </div>
+                                <div class="salary">Stipend: 75K/month</div>
+                                <button class="btn-primary student-btn">View Details</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="student-jobs" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Job Openings</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">John Smith</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Computer Science</div>
+                            </div>
+                            <div class="user-avatar student-avatar">JS</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Available Jobs</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Job Title</th>
+                                        <th>Company</th>
+                                        <th>Package (LPA)</th>
+                                        <th>Last Date</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Data Analyst</td>
+                                        <td>Amazon</td>
+                                        <td>15.0</td>
+                                        <td>Nov 15, 2025</td>
+                                        <td><span class="status-tag status-active">New</span></td>
+                                        <td><button class="btn-secondary btn-primary student-btn">Apply Now</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Product Engineer</td>
+                                        <td>Tesla</td>
+                                        <td>12.5</td>
+                                        <td>Nov 20, 2025</td>
+                                        <td><span class="status-tag status-active">New</span></td>
+                                        <td><button class="btn-secondary btn-primary student-btn">Apply Now</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>SDE-I</td>
+                                        <td>Meta</td>
+                                        <td>20.0</td>
+                                        <td>Oct 30, 2025</td>
+                                        <td><span class="status-tag status-inactive">Closed</span></td>
+                                        <td>N/A</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="student-applications" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>My Applications</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">John Smith</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Computer Science</div>
+                            </div>
+                            <div class="user-avatar student-avatar">JS</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Application Tracking</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Job Title</th>
+                                        <th>Company</th>
+                                        <th>Date Applied</th>
+                                        <th>Current Status</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Software Engineer</td>
+                                        <td>Google</td>
+                                        <td>Oct 10, 2025</td>
+                                        <td><span class="status-tag status-offered">Offer Letter</span></td>
+                                        <td><button class="btn-secondary btn-view">View Offer</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Junior Developer</td>
+                                        <td>HP</td>
+                                        <td>Oct 15, 2025</td>
+                                        <td><span class="status-tag status-interview">Interview Scheduled</span></td>
+                                        <td><button class="btn-secondary btn-view">View Schedule</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Data Scientist</td>
+                                        <td>NVIDIA</td>
+                                        <td>Oct 20, 2025</td>
+                                        <td><span class="status-tag status-pending">In Review</span></td>
+                                        <td>N/A</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Graduate Trainee</td>
+                                        <td>Cisco</td>
+                                        <td>Sep 5, 2025</td>
+                                        <td><span class="status-tag status-rejected">Rejected</span></td>
+                                        <td>N/A</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="student-resume" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Manage Resume</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">John Smith</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Computer Science</div>
+                            </div>
+                            <div class="user-avatar student-avatar">JS</div>
+                        </div>
+                    </div>
+                    <div class="profile-container">
+                        <div class="profile-header">
+                            <div class="profile-avatar student-avatar" style="background: var(--student-grad);">JS</div>
+                            <div class="profile-info">
+                                <h2>John Smith's Resume</h2>
+                                <p>Last Updated: October 20, 2025</p>
+                            </div>
+                             <div style="margin-left: auto;">
+                                 <button class="btn-secondary btn-primary student-btn">Upload New PDF</button>
+                                 <button class="btn-secondary btn-view">Download Current</button>
+                             </div>
+                        </div>
+                        <div class="resume-section">
+                            <h4>Education</h4>
+                            <div class="resume-item">
+                                <strong>B.Tech in Computer Science</strong>
+                                <span>2021 - 2025 | Cumulative CGPA: 8.5</span>
+                            </div>
+                        </div>
+                        <div class="resume-section">
+                            <h4>Experience</h4>
+                            <div class="resume-item">
+                                <strong>Software Intern at Tech Solutions Inc.</strong>
+                                <span>Summer 2024 | 3 Months</span>
+                                <p>Developed a microservice using Node.js and improved data processing speed by 40%.</p>
+                            </div>
+                        </div>
+                        <div class="resume-section">
+                            <h4>Skills</h4>
+                            <div class="resume-item">
+                                <span class="tag">Python</span>
+                                <span class="tag">JavaScript</span>
+                                <span class="tag">AWS</span>
+                                <span class="tag">Data Structures</span>
+                                <span class="tag">Git</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="student-interviews" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Interview Schedules</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">John Smith</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Computer Science</div>
+                            </div>
+                            <div class="user-avatar student-avatar">JS</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Upcoming Interviews</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Company</th>
+                                        <th>Role</th>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Room/Link</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>HP</td>
+                                        <td>Junior Developer</td>
+                                        <td>Nov 5, 2025</td>
+                                        <td>10:00 AM</td>
+                                        <td>Offline: Room 302, Placement Block</td>
+                                        <td><span class="status-tag status-interview">Scheduled</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>NVIDIA</td>
+                                        <td>Data Scientist</td>
+                                        <td>TBD</td>
+                                        <td>TBD</td>
+                                        <td>TBD (HR Contact will inform)</td>
+                                        <td><span class="status-tag status-pending">Pending</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <h3 style="margin-top: 30px;">Past Interviews</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Company</th>
+                                        <th>Role</th>
+                                        <th>Outcome</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Google</td>
+                                        <td>Software Engineer</td>
+                                        <td><span class="status-tag status-placed">Offered</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Cisco</td>
+                                        <td>Graduate Trainee</td>
+                                        <td><span class="status-tag status-rejected">Rejected</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="student-profile" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>My Profile</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">John Smith</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Computer Science</div>
+                            </div>
+                            <div class="user-avatar student-avatar">JS</div>
+                        </div>
+                    </div>
+                    <div class="profile-container">
+                        <div class="profile-header">
+                            <div class="profile-avatar student-avatar" style="background: var(--student-grad);">JS</div>
+                            <div class="profile-info">
+                                <h2>John Smith</h2>
+                                <p>S2025001 | Computer Science</p>
+                                <div class="portal-tag student-tag" style="margin-top: 10px;">Eligible for Placements</div>
+                            </div>
+                        </div>
+                        <form class="profile-form">
+                            <div class="form-group">
+                                <label>First Name</label>
+                                <input type="text" class="form-input" value="John" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Last Name</label>
+                                <input type="text" class="form-input" value="Smith" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Email Address</label>
+                                <input type="email" class="form-input" value="student@gmail.com" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Phone Number</label>
+                                <input type="tel" class="form-input" value="+1 987 654 3210" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Department</label>
+                                <input type="text" class="form-input" value="Computer Science" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label>CGPA (Current)</label>
+                                <input type="text" class="form-input" value="8.5" disabled>
+                            </div>
+                            <div class="form-group full-width">
+                                <label>Address</label>
+                                <textarea class="form-input">123 Main St, Anytown, State 12345</textarea>
+                            </div>
+                            <div class="form-group full-width">
+                                <button type="submit" class="btn-primary student-btn">Update Profile</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="student-settings" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Settings</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">John Smith</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Computer Science</div>
+                            </div>
+                            <div class="user-avatar student-avatar">JS</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Notification Preferences</h3>
+                        <form class="profile-form">
+                            <div class="form-group">
+                                <label>New Job Alerts</label>
+                                <select class="form-input">
+                                    <option>Email & SMS</option>
+                                    <option>Email Only</option>
+                                    <option>None</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Application Status Updates</label>
+                                <select class="form-input">
+                                    <option>Real-Time</option>
+                                    <option>Daily Digest</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Change Password</label>
+                                <button type="button" class="btn-secondary btn-primary student-btn" style="width: 100%; margin-top: 0;">Change Password</button>
+                            </div>
+                            <div class="form-group full-width">
+                                <button type="submit" class="btn-primary student-btn">Save Preferences</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="placement-login" class="screen auth-screen">
+            <div class="auth-container">
+                <div class="logo">
+                    <div class="logo-icon">🎓</div>
+                    <h1>Placement Management</h1>
+                    <p>Placement Office Portal</p>
+                    <div class="portal-tag placement-tag">Placement Officer Access</div>
+                </div>
+                <div class="credentials-box">
+                    <strong>🔐 Demo Credentials</strong>
+                    <p>Email: placement@gmail.com</p>
+                    <p>Password: 1234</p>
+                </div>
+                <form onsubmit="return handlePlacementLogin(event)">
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" class="form-input" id="placementEmail" placeholder="placement@gmail.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" class="form-input" id="placementPassword" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="btn-primary placement-btn">Sign In</button>
+                    <div class="link-text">
+                        <a onclick="showScreen('placement-forget')">Forgot your password?</a>
+                    </div>
+                    <div class="link-text">
+                        <a onclick="showScreen('portal-selection')">← Back to Portal Selection</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="placement-forget" class="screen auth-screen">
+            <div class="auth-container">
+                <div class="logo">
+                    <div class="logo-icon">🔒</div>
+                    <h1>Reset Password</h1>
+                    <p>Placement Office Portal</p>
+                    <div class="portal-tag placement-tag">Placement Officer Access</div>
+                </div>
+                <p style="text-align: center; color: var(--light-text); margin-bottom: 25px;">
+                    Enter your email address and we'll send you a link to reset your password.
+                </p>
+                <form>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" class="form-input" placeholder="placement@gmail.com" required>
+                    </div>
+                    <button type="button" class="btn-primary placement-btn" onclick="showScreen('placement-reset')">Send Reset Link</button>
+                    <div class="link-text">
+                        <a onclick="showScreen('placement-login')">Back to Login</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="placement-reset" class="screen auth-screen">
+            <div class="auth-container">
+                <div class="logo">
+                    <div class="logo-icon">🔑</div>
+                    <h1>Create New Password</h1>
+                    <p>Placement Office Portal</p>
+                    <div class="portal-tag placement-tag">Placement Officer Access</div>
+                </div>
+                <form>
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" class="form-input" placeholder="Enter new password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <input type="password" class="form-input" placeholder="Confirm new password" required>
+                    </div>
+                    <button type="button" class="btn-primary placement-btn" onclick="showScreen('placement-login')">Reset Password</button>
+                    <div class="link-text">
+                        <a onclick="showScreen('placement-login')">Back to Login</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="placement-dashboard" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Placement Officer Dashboard</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Placement Officer</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Coordinator</div>
+                            </div>
+                            <div class="user-avatar placement-avatar">PO</div>
+                        </div>
+                    </div>
+                    <div class="stats-grid placement-stats">
+                        <div class="stat-card">
+                            <h3>Scheduled Drives</h3>
+                            <div class="number">14</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Students Cleared All Rounds</h3>
+                            <div class="number">65</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Next Drive Date</h3>
+                            <div class="number" style="font-size: 28px;">Dec 15, 2025</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Average CTC (LPA)</h3>
+                            <div class="number">12.8</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Priority Tasks</h3>
+                        <div style="color: #4a5568; line-height: 2;">
+                            <p>• Finalize interview slots for **Microsoft** drive next week.</p>
+                            <p>• Send thank-you note and placement report to **Google HR**.</p>
+                            <p>• Update student profiles for the **45 new registrants**.</p>
+                            <p>• Prepare the venue for the **TCS** recruitment event in January.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="placement-companies" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Company Relations</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Placement Officer</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Coordinator</div>
+                            </div>
+                            <div class="user-avatar placement-avatar">PO</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Key Recruiting Partners</h3>
+                        <div class="card-grid">
+                            <div class="company-card">
+                                <h4>Google</h4>
+                                <div class="location">Technology | 20 Hires in 2024</div>
+                                <div class="details">Tier 1 partner. Focus on SDE roles. Next drive: Dec 15. Contact: Sundar Pichai.</div>
+                                <button class="btn-secondary btn-view">View History</button>
+                                <button class="btn-secondary btn-edit">Update Details</button>
+                            </div>
+                            <div class="company-card">
+                                <h4>Microsoft</h4>
+                                <div class="location">Technology | 15 Hires in 2024</div>
+                                <div class="details">Strong presence for Program Manager and Developer roles. Next visit: Nov 5. Contact: Satya Nadella.</div>
+                                <button class="btn-secondary btn-view">View History</button>
+                                <button class="btn-secondary btn-edit">Update Details</button>
+                            </div>
+                            <div class="company-card">
+                                <h4>Tata Motors</h4>
+                                <div class="location">Automotive | 30 Hires in 2024</div>
+                                <div class="details">Primary recruiter for Mechanical and Electrical Engineering students. Next visit: Jan 2026.</div>
+                                <button class="btn-secondary btn-view">View History</button>
+                                <button class="btn-secondary btn-edit">Update Details</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="placement-schedules" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Schedule Management</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Placement Officer</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Coordinator</div>
+                            </div>
+                            <div class="user-avatar placement-avatar">PO</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Upcoming Events</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Event</th>
+                                        <th>Company</th>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Location</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Interviews - Round 1</td>
+                                        <td>Microsoft</td>
+                                        <td>Nov 5, 2025</td>
+                                        <td>9:00 AM - 5:00 PM</td>
+                                        <td>Placement Block, Rooms 301-305</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Placement Drive</td>
+                                        <td>Google</td>
+                                        <td>Dec 15, 2025</td>
+                                        <td>All Day</td>
+                                        <td>Auditorium & Computer Lab 1</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Pre-Placement Talk</td>
+                                        <td>Amazon</td>
+                                        <td>Nov 25, 2025</td>
+                                        <td>2:00 PM - 3:00 PM</td>
+                                        <td>Online (Zoom Link)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <button class="btn-primary placement-btn" style="width: auto;">+ Add New Schedule</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="placement-students" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Eligible Students</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Placement Officer</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Coordinator</div>
+                            </div>
+                            <div class="user-avatar placement-avatar">PO</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Students Filtered for Microsoft Drive (CS/ECE > 8.0 CGPA)</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Student ID</th>
+                                        <th>Name</th>
+                                        <th>Department</th>
+                                        <th>CGPA</th>
+                                        <th>Resume</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>S2025002</td>
+                                        <td>Emily Davis</td>
+                                        <td>Electronics</td>
+                                        <td>9.2</td>
+                                        <td><span class="status-tag status-active">Verified</span></td>
+                                        <td><button class="btn-secondary btn-view">View Profile</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>S2025004</td>
+                                        <td>Jessica Wilson</td>
+                                        <td>Computer Science</td>
+                                        <td>9.5</td>
+                                        <td><span class="status-tag status-active">Verified</span></td>
+                                        <td><button class="btn-secondary btn-view">View Profile</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>S2025010</td>
+                                        <td>Alex Johnson</td>
+                                        <td>Computer Science</td>
+                                        <td>8.8</td>
+                                        <td><span class="status-tag status-pending">Needs Review</span></td>
+                                        <td><button class="btn-secondary btn-edit">Review</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="placement-drives" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Manage Drives</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Placement Officer</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Coordinator</div>
+                            </div>
+                            <div class="user-avatar placement-avatar">PO</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Ongoing & Future Placement Drives</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Company</th>
+                                        <th>Date</th>
+                                        <th>Target Roles</th>
+                                        <th>Applications</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Microsoft</td>
+                                        <td>Nov 5, 2025</td>
+                                        <td>PM, SDE</td>
+                                        <td>85</td>
+                                        <td><span class="status-tag status-active">Active</span></td>
+                                        <td><button class="btn-secondary btn-view">Manage</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Google</td>
+                                        <td>Dec 15, 2025</td>
+                                        <td>SDE</td>
+                                        <td>210</td>
+                                        <td><span class="status-tag status-pending">Pre-screening</span></td>
+                                        <td><button class="btn-secondary btn-view">Manage</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>TCS</td>
+                                        <td>Jan 20, 2026</td>
+                                        <td>GET, Trainee</td>
+                                        <td>0 (Upcoming)</td>
+                                        <td><span class="status-tag status-inactive">Planned</span></td>
+                                        <td><button class="btn-secondary btn-edit">Edit</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <button class="btn-primary placement-btn" style="width: auto;">+ Create New Drive</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="placement-analytics" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Analytics Hub</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Placement Officer</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Coordinator</div>
+                            </div>
+                            <div class="user-avatar placement-avatar">PO</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Placement Rate Trend (Last 5 Years)</h3>
+                        <div class="chart-placeholder">
+                            [ Line Chart: 2021 (75%), 2022 (78%), 2023 (80%), 2024 (82%), 2025 (84%) ]
+                        </div>
+                    </div>
+                    <div class="content-box" style="border-radius: 12px;">
+                        <h3>Salary Distribution</h3>
+                        <div class="chart-placeholder">
+                            [ Pie Chart: >20 LPA (15%), 10-20 LPA (45%), 5-10 LPA (30%), <5 LPA (10%) ]
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="placement-profile" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>My Profile</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Placement Officer</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Coordinator</div>
+                            </div>
+                            <div class="user-avatar placement-avatar">PO</div>
+                        </div>
+                    </div>
+                    <div class="profile-container">
+                        <div class="profile-header">
+                            <div class="profile-avatar placement-avatar" style="background: var(--placement-grad);">PO</div>
+                            <div class="profile-info">
+                                <h2>Placement Officer</h2>
+                                <p>placement@gmail.com</p>
+                                <div class="portal-tag placement-tag" style="margin-top: 10px;">Coordinator</div>
+                            </div>
+                        </div>
+                        <form class="profile-form">
+                            <div class="form-group">
+                                <label>First Name</label>
+                                <input type="text" class="form-input" value="Placement" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Last Name</label>
+                                <input type="text" class="form-input" value="Officer" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Email Address</label>
+                                <input type="email" class="form-input" value="placement@gmail.com" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Phone Number</label>
+                                <input type="tel" class="form-input" value="+1 123 123 1234" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Role</label>
+                                <input type="text" class="form-input" value="Coordinator" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Years of Experience</label>
+                                <input type="text" class="form-input" value="5" required>
+                            </div>
+                            <div class="form-group full-width">
+                                <button type="submit" class="btn-primary placement-btn">Update Profile</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="placement-settings" class="screen dashboard-screen">
+            <div class="dashboard-container">
+                <div class="main-content">
+                    <div class="top-bar">
+                        <h2>Settings</h2>
+                        <div class="user-info">
+                            <div>
+                                <div style="font-weight: 600; color: var(--dark-text);">Placement Officer</div>
+                                <div style="font-size: 12px; color: var(--light-text);">Coordinator</div>
+                            </div>
+                            <div class="user-avatar placement-avatar">PO</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <h3>Office Preferences</h3>
+                        <form class="profile-form">
+                            <div class="form-group">
+                                <label>Default Interview Room</label>
+                                <input type="text" class="form-input" value="Placement Block, Room 301" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Default Email Template</label>
+                                <select class="form-input">
+                                    <option>Corporate Standard</option>
+                                    <option>Friendly Casual</option>
+                                </select>
+                            </div>
+                            <div class="form-group full-width">
+                                <button type="submit" class="btn-primary placement-btn">Save Settings</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+    
+    <div class="chatbot-container">
+        <div class="chatbot-window" id="chatbotWindow">
+            <div class="chatbot-header">
+                <span>Placement Assistant AI</span>
+                <button onclick="toggleChatbot()">✕</button>
+            </div>
+            <div class="chatbot-messages" id="chatbotMessages">
+                </div>
+            <div class="chatbot-input-area">
+                <input type="text" id="chatInput" placeholder="Ask a question..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+                <button onclick="sendChatMessage()">➤</button>
+            </div>
+        </div>
+        <button class="chatbot-toggle-btn" onclick="toggleChatbot()">🤖</button>
+        <!-- <button class="chatbot-toggle-btn" onclick="toggleChatbot()" style="
+            margin-left: 80%;
+        ">🤖</button> -->
+    </div>
+
+    <script>
+        // --- Core Navigation Logic ---
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+
+            // Set active class on navigation button
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-screen') === screenId) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Close mobile menu if active
+            const sideNav = document.getElementById('sideNav');
+            const navOverlay = document.getElementById('navOverlay');
+            const menuBtn = document.getElementById('menuBtn');
+            sideNav.classList.remove('active');
+            navOverlay.classList.remove('active');
+            menuBtn.classList.remove('active');
+            
+            // --- NEW: Reset chatbot for the new screen ---
+            resetChatbot(); 
+            // ---------------------------------------------
+        }
+
+        function toggleMenu() {
+            const sideNav = document.getElementById('sideNav');
+            const navOverlay = document.getElementById('navOverlay');
+            const menuBtn = document.getElementById('menuBtn');
+            sideNav.classList.toggle('active');
+            navOverlay.classList.toggle('active');
+            menuBtn.classList.toggle('active');
+        }
+
+        function logout() {
+            document.body.className = 'logged-out'; // Reset to logged-out state
+            showScreen('portal-selection');
+        }
+
+        // --- NEW: Chatbot Functions ---
+
+        function toggleChatbot() {
+            const chatWindow = document.getElementById('chatbotWindow');
+            chatWindow.classList.toggle('active');
+            if (chatWindow.classList.contains('active')) {
+                 // Focus on input when opened
+                 document.getElementById('chatInput').focus();
+            }
+        }
+        
+        function appendMessage(sender, text) {
+            const messagesContainer = document.getElementById('chatbotMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}`;
+            
+            // Use innerHTML to render markdown (bold text for dummy data)
+            messageDiv.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            messagesContainer.appendChild(messageDiv);
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        function getPortal() {
+            if (document.body.classList.contains('admin-logged-in')) return 'admin';
+            if (document.body.classList.contains('student-logged-in')) return 'student';
+            if (document.body.classList.contains('placement-logged-in')) return 'placement';
+            return 'guest';
+        }
+        
+        function getBotResponse(portal, message) {
+            const lowerCaseMessage = message.toLowerCase();
+            
+            // Generic Responses
+            if (lowerCaseMessage.includes('hello') || lowerCaseMessage.includes('hi')) {
+                return `Hello! I am your AI Placement Assistant. How can I help you today in the **${portal.toUpperCase()} Portal**?`;
+            }
+            if (lowerCaseMessage.includes('thank')) {
+                return "You're welcome! Feel free to ask anything else.";
+            }
+            if (lowerCaseMessage.includes('who are you')) {
+                return "I am the **Placement Assistant AI**, designed to help you quickly access key information and statistics for your current portal.";
+            }
+            
+            // Portal-specific Dummy Data Responses
+            if (portal === 'admin') {
+                if (lowerCaseMessage.includes('students')) {
+                    return "The current enrollment is **1,245 students**. You can view details in the 'Manage Students' section.";
+                }
+                if (lowerCaseMessage.includes('companies')) {
+                    return "We have **87 active companies** this cycle. The next major drive is with Google on Dec 15, 2025.";
+                }
+                if (lowerCaseMessage.includes('rate') || lowerCaseMessage.includes('placement')) {
+                    return "Our current placement rate is **84%** for the 2025 batch. This is an all-time high!";
+                }
+                return `As an Admin, you can ask me about **Students**, **Companies**, or the overall **Placement Rate** stats.`;
+            } 
+            
+            if (portal === 'student') {
+                if (lowerCaseMessage.includes('jobs') || lowerCaseMessage.includes('openings')) {
+                    return "There are **15 new job openings** posted this week! Check the 'Job Openings' screen for details. The minimum CGPA is 7.0.";
+                }
+                if (lowerCaseMessage.includes('application') || lowerCaseMessage.includes('status')) {
+                    return "You currently have **3 pending applications** and 1 scheduled interview. Check the 'Applications' screen.";
+                }
+                if (lowerCaseMessage.includes('resume')) {
+                    return "Remember to update your resume with your latest project details. A well-formatted resume increases your chances by 20%.";
+                }
+                return `As a Student, you can ask me about **Jobs**, your **Application Status**, or tips on your **Resume**.`;
+            }
+            
+            if (portal === 'placement') {
+                if (lowerCaseMessage.includes('schedules') || lowerCaseMessage.includes('interviews')) {
+                    return "We have **6 interviews scheduled** for next week, including a major drive with Microsoft. Please finalize the rooms.";
+                }
+                if (lowerCaseMessage.includes('drives') || lowerCaseMessage.includes('upcoming')) {
+                    return "The next major drive is with **Google** on Dec 15. The target is 15 hires. Don't forget to send the required documents.";
+                }
+                if (lowerCaseMessage.includes('analytics')) {
+                    return "The CS department has the highest placement rate at **92%**. Focus on securing more opportunities for the Mechanical department (**75%**).";
+                }
+                return `As a Placement Officer, you can ask me about **Schedules**, **Upcoming Drives**, or **Analytics** highlights.`;
+            }
+            
+            // Fallback
+            return "I'm not sure how to answer that. Try asking about the main functions of your current portal (e.g., 'Students' for Admin, 'Jobs' for Student, 'Schedules' for Placement).";
+        }
+
+        function sendChatMessage() {
+            const chatInput = document.getElementById('chatInput');
+            const message = chatInput.value.trim();
+            
+            if (message === '') return;
+
+            appendMessage('user', message);
+            chatInput.value = '';
+            
+            const portal = getPortal();
+            
+            // Simulate AI delay
+            setTimeout(() => {
+                const response = getBotResponse(portal, message);
+                appendMessage('bot', response);
+            }, 500);
+        }
+        
+        function resetChatbot() {
+             const messagesContainer = document.getElementById('chatbotMessages');
+             // Close the window
+             document.getElementById('chatbotWindow').classList.remove('active');
+             
+             // Clear old messages
+             messagesContainer.innerHTML = ''; 
+             
+             // Add a new welcome message based on the portal
+             const portal = getPortal();
+             if (portal !== 'guest') {
+                 // Delay the welcome message slightly for better UX after screen transition
+                 setTimeout(() => {
+                    appendMessage('bot', getBotResponse(portal, 'hello'));
+                 }, 50);
+             }
+        }
+
+        // --- Login Handlers (Modified to call resetChatbot) ---
+        function handleAdminLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            
+            if (email === 'admin@gmail.com' && password === '1234') {
+                document.body.className = 'logged-in admin-logged-in'; // Set logged-in state
+                showScreen('admin-dashboard');
+                resetChatbot();
+            } else {
+                alert('Invalid credentials! Please use:\nEmail: admin@gmail.com\nPassword: 1234');
+            }
+            return false;
+        }
+
+        function handleStudentLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('studentEmail').value;
+            const password = document.getElementById('studentPassword').value;
+            
+            if (email === 'student@gmail.com' && password === '1234') {
+                document.body.className = 'logged-in student-logged-in'; // Set logged-in state
+                showScreen('student-dashboard');
+                resetChatbot();
+            } else {
+                alert('Invalid credentials! Please use:\nEmail: student@gmail.com\nPassword: 1234');
+            }
+            return false;
+        }
+
+        function handlePlacementLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('placementEmail').value;
+            const password = document.getElementById('placementPassword').value;
+            
+            if (email === 'placement@gmail.com' && password === '1234') {
+                document.body.className = 'logged-in placement-logged-in'; // Set logged-in state
+                showScreen('placement-dashboard');
+                resetChatbot();
+            } else {
+                alert('Invalid credentials! Please use:\nEmail: placement@gmail.com\nPassword: 1234');
+            }
+            return false;
+        }
+        
+        // Ensure correct layout on resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 1024 && !document.body.classList.contains('logged-out')) {
+                // If resizing to desktop while logged in, close mobile menu
+                const sideNav = document.getElementById('sideNav');
+                const navOverlay = document.getElementById('navOverlay');
+                const menuBtn = document.getElementById('menuBtn');
+                
+                sideNav.classList.remove('active');
+                navOverlay.classList.remove('active');
+                menuBtn.classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>
